@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { schedule, GAPS, DAY, startOfDay, nextMode, isDue } from '../js/srs.js';
-import { brier, calibrationBins, foldForecast, parseNum, factorError, streak, median } from '../js/scoring.js';
-import { TYPE_KEYS, makeProblem, isCorrect, nextType, adapt, makeBaseRate } from '../js/arith.js';
+import { brier, calibrationBins, foldForecast, parseNum, factorError, streak, median, forecastBrier, canUpdate, dueEnd, firstP } from '../js/scoring.js';
+import { TYPES, TYPE_KEYS, BASIC, makeProblem, makeApplied, isCorrect, nextType, adapt, levelOf, summarise, typeWeights, learnedKeys, nextToLearn, learnPassed, makeBaseRate } from '../js/arith.js';
 import { CONCEPTS, DOMAINS } from '../data/concepts.js';
 import { JUDGEMENT } from '../data/judgement.js';
 import { ESTIMATES } from '../data/estimate.js';
-import { DIVE_PROMPTS } from '../data/prompts.js';
+import { DIVE_PROMPTS, BRIEFS } from '../data/prompts.js';
 import { dayKey } from '../js/srs.js';
 
 const now = new Date(2026, 10, 12, 15).getTime();
@@ -56,15 +56,86 @@ test('arithmetic problems are well formed and self-consistent', () => {
   assert.ok(!isCorrect(makeProblem('mult', 1, rnd), ''));
 });
 
-test('interleaving and adaptation', () => {
+test('interleaving never repeats a type', () => {
   let prev = null;
-  for (let i = 0; i < 100; i++) { const t = nextType(prev); assert.notEqual(t, prev); prev = t; }
-  let s = { level: 1, run: 0, miss: 0 };
-  for (let i = 0; i < 3; i++) s = adapt(s, true, 5000);
-  assert.equal(s.level, 2);
-  s = adapt(adapt(s, false, 5000), false, 5000);
-  assert.equal(s.level, 1);
-  s = adapt(s, true, 60000); assert.equal(s.run, 0);
+  for (let i = 0; i < 200; i++) { const t = nextType(prev); assert.notEqual(t, prev); prev = t; }
+  assert.equal(nextType('add', Math.random, ['add']), 'add');
+});
+
+test('difficulty settles where about 85% of answers are right', () => {
+  // A simulated learner who is near-perfect at level 1 and gets worse as problems get harder.
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pRight = (level) => [0, 0.99, 0.93, 0.82, 0.6, 0.35][level];
+  let stat, right = 0, n = 0;
+  for (let i = 0; i < 6000; i++) {
+    const ok = rnd() < pRight(levelOf(stat));
+    stat = adapt(stat, ok, 5000);
+    if (i >= 1000) { n++; if (ok) right++; }
+  }
+  assert.ok(right / n > 0.8 && right / n < 0.9, `accuracy ${right / n}`);
+  assert.equal(stat.hist.length, 20);
+  assert.ok(stat.rating >= 1 && stat.rating <= 5);
+  let low = { rating: 1 }; low = adapt(low, false, 1); assert.equal(low.rating, 1);
+  let cap = { rating: 3 }; for (let i = 0; i < 50; i++) cap = adapt(cap, true, 1, 30000, 3); assert.equal(cap.rating, 3);
+});
+
+test('weak and slow types get more of the sprint', () => {
+  const hist = (acc, ms) => Array.from({ length: 20 }, (_, i) => [i < acc * 20 ? 1 : 0, ms]);
+  const stats = { add: { hist: hist(1, 4000) }, sub: { hist: hist(0.6, 4000) }, mult: { hist: hist(1, 9000) }, div: { hist: hist(1, 4000).slice(0, 3) } };
+  const w = typeWeights(stats, ['add', 'sub', 'mult', 'div']);
+  assert.ok(w.sub > w.mult && w.mult > w.add, JSON.stringify(w));
+  assert.equal(w.div, 1.5);
+  assert.deepEqual(summarise(stats.sub), { n: 20, acc: 0.6, ms: 4000 });
+  let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const counts = { add: 0, sub: 0, mult: 0, div: 0 }; let prev = null;
+  for (let i = 0; i < 4000; i++) { prev = nextType(prev, rnd, ['add', 'sub', 'mult', 'div'], w); counts[prev]++; }
+  assert.ok(counts.sub > counts.add * 1.4, JSON.stringify(counts));
+});
+
+test('learn mode gates the taught methods', () => {
+  assert.deepEqual(learnedKeys({}), BASIC);
+  assert.equal(nextToLearn({}), TYPE_KEYS.find((k) => !BASIC.includes(k)));
+  const all = Object.fromEntries(TYPE_KEYS.map((k) => [k, { learned: true }]));
+  assert.equal(nextToLearn(all), null); assert.equal(learnedKeys(all).length, TYPE_KEYS.length);
+  assert.ok(!learnPassed([true, true, true]));
+  assert.ok(learnPassed([false, ...Array(9).fill(true)]));
+  assert.ok(!learnPassed([...Array(8).fill(true), false, false]));
+  assert.ok(learnPassed([false, false, false, false, false, false, ...Array(10).fill(true)]));
+  for (const k of TYPE_KEYS) assert.ok(TYPES[k].method && TYPES[k].example, k);
+});
+
+test('applied problems are well formed', () => {
+  let seed = 5; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const kinds = new Set();
+  for (let L = 1; L <= 3; L++) for (let i = 0; i < 1500; i++) {
+    const p = makeApplied(L, rnd); kinds.add(p.kind);
+    assert.ok(Number.isFinite(p.a) && p.a !== 0, p.q);
+    assert.ok(isCorrect(p, p.a), p.q); assert.ok(!isCorrect(p, Math.abs(p.a) * 2 + 50), p.q);
+    assert.ok(!/NaN|undefined|Infinity/.test(p.q + p.why), p.q + ' | ' + p.why);
+    assert.ok(p.q.length < 170, p.q);
+  }
+  assert.equal(kinds.size, 15);
+  assert.notEqual(makeApplied(1, () => 0, 0).kind, 0);
+});
+
+test('forecasts are scored by time held and lock after the due date', () => {
+  const DAYMS = 86400000, t0 = new Date('2026-01-01T12:00:00').getTime();
+  const f = { p: 0.9, created: t0, due: '2026-01-11', updates: [{ t: t0, p: 0.5 }, { t: t0 + 8 * DAYMS, p: 0.9 }], outcome: 1, resolved: t0 + 10 * DAYMS };
+  // 8 days at 50% (0.25) and 2 days at 90% (0.01)
+  assert.ok(Math.abs(forecastBrier(f) - (8 * 0.25 + 2 * 0.01) / 10) < 1e-9);
+  assert.equal(firstP(f), 0.5);
+  // a last-minute jump barely helps
+  const late = { ...f, updates: [{ t: t0, p: 0.5 }, { t: t0 + 10 * DAYMS - 60000, p: 0.99 }] };
+  assert.ok(forecastBrier(late) > 0.249);
+  // time after the due date does not count, and an update made after it is ignored
+  const overdue = { ...f, resolved: t0 + 60 * DAYMS, updates: [{ t: t0, p: 0.5 }, { t: t0 + 30 * DAYMS, p: 1 }] };
+  assert.ok(Math.abs(forecastBrier(overdue) - 0.25) < 1e-9);
+  // single forecast, and one resolved the instant it was made
+  assert.ok(Math.abs(forecastBrier({ p: 0.8, created: t0, due: '2026-01-11', updates: [{ t: t0, p: 0.8 }], outcome: 1, resolved: t0 + DAYMS }) - 0.04) < 1e-9);
+  assert.ok(Math.abs(forecastBrier({ p: 0.8, created: t0, due: '2026-01-11', updates: [{ t: t0, p: 0.8 }], outcome: 0, resolved: t0 }) - 0.64) < 1e-9);
+  assert.ok(canUpdate({ outcome: null, due: '2026-01-11' }, dueEnd('2026-01-11') - 1));
+  assert.ok(!canUpdate({ outcome: null, due: '2026-01-11' }, dueEnd('2026-01-11') + 1));
+  assert.ok(!canUpdate({ outcome: 1, due: '2026-01-11' }, t0));
 });
 
 test('base-rate problems', () => {
@@ -83,6 +154,20 @@ test('content integrity', () => {
     for (const l of c.links) assert.ok(ids.has(l), `${c.id} -> ${l}`);
     assert.ok(!c.links.includes(c.id));
   }
+  // Judgement options: similar lengths, and neither length nor position gives the answer away.
+  let longest = 0; const pos = [0, 0, 0];
+  for (const j of JUDGEMENT) {
+    const L = j.options.map((o) => o.length);
+    assert.ok(Math.max(...L) / Math.min(...L) <= 1.3, `${j.id} option lengths ${L}`);
+    if (L[j.best] === Math.max(...L)) longest++;
+    pos[j.best]++;
+    assert.ok(!/option [abc]/i.test(j.why), j.id);
+  }
+  assert.ok(JUDGEMENT.length >= 36);
+  assert.ok(longest / JUDGEMENT.length <= 0.55, `best is longest in ${longest}`);
+  assert.ok(Math.min(...pos) >= 9, `positions ${pos}`);
+  assert.ok(BRIEFS.length >= 12); assert.equal(new Set(BRIEFS.map((b) => b.id)).size, BRIEFS.length);
+  for (const b of BRIEFS) { const w = b.model.split(/\s+/).length; assert.ok(w >= 60 && w <= 90, `${b.id} model ${w} words`); }
   for (const j of JUDGEMENT) { assert.ok(j.best < j.options.length); if (j.link) assert.ok(ids.has(j.link), j.id); }
   assert.equal(new Set(JUDGEMENT.map((j) => j.id)).size, JUDGEMENT.length);
   assert.equal(new Set(ESTIMATES.map((e) => e.id)).size, ESTIMATES.length);

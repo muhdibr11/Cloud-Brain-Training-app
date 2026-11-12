@@ -7,7 +7,7 @@ export function render(root) {
   const open = get().dives.filter((d) => !d.done).length;
   root.innerHTML = `${head('Practice')}
     <h3>Numbers</h3><section class="card"><ul class="list">
-      ${item('#/practice/sprint', 'Arithmetic sprint', 'Timed, mixed types, adapts to you')}
+      ${item('#/practice/sprint', 'Arithmetic', 'Learn a method, mixed sprint or applied problems')}
       ${item('#/practice/baserate', 'Base rates', 'Probability problems with frequency trees')}
       ${item('#/practice/estimate', 'Estimation', 'Fermi questions and 90% ranges')}
     </ul></section>

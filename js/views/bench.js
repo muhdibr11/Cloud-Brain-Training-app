@@ -41,7 +41,7 @@ export function render(root) {
   let stop = null;
   const out = {};
   const stages = [
-    (next) => { stop = runSprint(root, { secs: 120, fixedLevel: 3, back: BACK, onDone: (r) => { out.arithRate = r.rate; out.arithAcc = r.acc; stop = null; next(); } }); },
+    (next) => { stop = runSprint(root, { mode: 'bench', secs: 120, fixedLevel: 3, back: BACK, onDone: (r) => { out.arithRate = r.rate; out.arithAcc = r.acc; stop = null; next(); } }); },
     (next) => runBaseRate(root, { n: 4, back: BACK, onDone: (r) => { out.baseAcc = r.correct / r.n; next(); } }),
     (next) => runEstimate(root, { n: 8, back: BACK, onDone: (r) => { out.intervalHit = r.n ? r.hits / r.n : null; next(); } }),
     (next) => runTransfer(root, { n: 6, onDone: (r) => { out.transfer = r.score; out.transferN = r.n; next(); } }),

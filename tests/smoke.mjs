@@ -52,13 +52,29 @@ try {
     if (n[0] !== 3 || n[1] !== 3 || n[2] !== '0,0,1') throw new Error('review state ' + JSON.stringify(n));
   });
 
-  await run('arithmetic sprint', async () => {
+  await run('arithmetic: learn set, mixed sprint, applied sprint', async () => {
     await store('s.settings.sprintSecs = 4;');
-    await nav('#/practice/sprint'); await act('start'); await shot('05-sprint');
-    await act('key', '[data-k="1"]'); await act('enter');
-    await page.waitForTimeout(300);
-    if (await page.locator('#view [data-act="next"]').count()) { await expect(/Answer:/, 'feedback'); await shot('06-sprint-wrong'); await act('next'); }
+    await nav('#/today'); await expect(/Arithmetic: learn a method/, 'today suggests learning');
+    await nav('#/practice/sprint'); await expect(/Learn: Percentages/, 'learn card'); await expect(/to learn/, 'type table'); await shot('05-arith-home');
+    // Learn set: answer correctly by asking the generator's own checker through the page.
+    await act('learn'); await expect(/need 9 of 10/, 'learn status');
+    await act('key', '[data-k="1"]'); await act('enter'); await page.waitForTimeout(100);
+    if (await page.locator('#view [data-act="next"]').count()) { await expect(/Answer:/, 'feedback'); await shot('06-learn-wrong'); await act('next'); }
+    // Finish the set with correct answers typed on the keyboard, until nine of the last ten are right.
+    for (let i = 0; i < 12 && await page.locator('.sprint-q').count(); i++) {
+      const q = await page.locator('.sprint-q').innerText(); const m = q.match(/([\d.]+)% of ([\d,]+)/);
+      if (!m) throw new Error('unexpected learn question: ' + q);
+      await page.keyboard.type(String(Math.round(Number(m[1]) * Number(m[2].replace(/,/g, ''))) / 100)); await page.keyboard.press('Enter'); await page.waitForTimeout(40);
+    }
+    await expect(/Learned/, 'learn passed'); await expect(/now appears in your mixed sprints/, 'joined'); await shot('06b-learned');
+    await act('more'); await expect(/Learn: Percent change/, 'next method'); await expect(/5 types you have learned/, 'learned count');
+    await act('mixed'); await shot('07-sprint'); await act('key', '[data-k="1"]'); await act('enter'); await page.waitForTimeout(200);
+    if (await page.locator('#view [data-act="next"]').count()) await act('next');
     await page.waitForSelector('text=Sprint done', { timeout: 15000 }); await expect(/correct per minute/, 'summary');
+    await act('more'); await act('applied'); await page.waitForTimeout(100); await expect(/Applied/, 'applied label'); await shot('08-applied');
+    await page.waitForSelector('text=Sprint done', { timeout: 15000 });
+    const a = await page.evaluate(async () => { const m = await import('/js/store.js'); const s = m.get(); return { modes: s.arith.sessions.map((x) => x.mode).join(), keys: Object.values(s.arith.stats).reduce((n, x) => n + (x.hist || []).length, 0) }; });
+    if (a.modes !== 'mixed,applied' || a.keys < 1) throw new Error('arith state ' + JSON.stringify(a));
     await store('s.settings.sprintSecs = 180;');
   });
 
@@ -94,6 +110,9 @@ try {
     if (!/SCORES \{"answer":3/.test(clip) || !/SOURCE MATERIAL/.test(clip)) throw new Error('prompt not on clipboard: ' + clip.slice(0, 200));
     await page.fill('#crit-in', reply(['answer', 'selection', 'reasoning', 'clarity'])); await act('crit-read'); await expect(/4\.0 \/ 5/, 'scores'); await shot('12-writing-review');
     await page.fill('#crit-in', 'no scores here'); await act('crit-read');
+    await act('rewrite'); await expect(/What to fix/, 'rewrite stage'); await expect(/The opening is slow/, 'feedback shown'); await act('done2'); await expect(/What to fix/, 'unchanged text refused');
+    await page.fill('#text2', 'Renew with Henley for one year at no more than four percent, with penalties for late delivery, and qualify a second supplier meanwhile.'); await act('done2');
+    await expect(/Before and after/, 'compare'); await page.fill('#crit-in', reply(['answer', 'selection', 'reasoning', 'clarity']).replace(/:4/g, ':5')); await act('crit-read'); await expect(/4\.0 → 5\.0/, 'delta'); await shot('12b-rewrite');
   });
 
   await run('speaking by dictation', async () => {
@@ -113,7 +132,11 @@ try {
     await nav('#/forecasts'); await act('add');
     await page.fill('#q', 'Will the Bank of England cut rates at its next meeting?'); await page.fill('#base', 'Cuts at about a third of meetings'); await page.locator('#p').fill('80');
     await shot('17-forecast-new'); await act('save'); await expect(/80%/, 'saved');
-    await act('open'); await act('resolve', '[data-o="1"]'); await expect(/Brier 0\.04/, 'brier'); await shot('18-forecasts');
+    await act('open'); await expect(/Save update/, 'can update before due');
+    await store("s.forecasts[0].due = '2020-01-01';"); await nav('#/today'); await nav('#/forecasts'); await act('open'); await expect(/probability is locked/, 'locked after due');
+    if (await page.locator('#view [data-act="update"]').count()) throw new Error('update still offered after the due date');
+    await store("s.forecasts[0].due = '2099-01-01';"); await nav('#/today'); await nav('#/forecasts'); await act('open');
+    await act('resolve', '[data-o="1"]'); await expect(/Brier 0\.04/, 'brier'); await shot('18-forecasts');
   });
 
   await run('benchmark', async () => {
@@ -137,8 +160,8 @@ try {
 
   await run('data survives a reload', async () => {
     await page.reload(); await page.waitForSelector('#view h1'); await nav('#/progress');
-    const n = await page.evaluate(async () => { const m = await import('/js/store.js'); const s = m.get(); return { cards: Object.keys(s.cards).length, f: s.forecasts.length, custom: s.custom.length, w: s.writing[0]?.scores?.answer }; });
-    if (n.cards !== 3 || n.f !== 1 || n.custom !== 2 || n.w !== 4) throw new Error('persisted state ' + JSON.stringify(n));
+    const n = await page.evaluate(async () => { const m = await import('/js/store.js'); const s = m.get(); return { cards: Object.keys(s.cards).length, f: s.forecasts.length, custom: s.custom.length, w: s.writing[0]?.scores?.answer, w2: s.writing[0]?.scores2?.answer }; });
+    if (n.cards !== 3 || n.f !== 1 || n.custom !== 2 || n.w !== 4 || n.w2 !== 5) throw new Error('persisted state ' + JSON.stringify(n));
     await nav('#/today'); await shot('23-today-after');
   });
 

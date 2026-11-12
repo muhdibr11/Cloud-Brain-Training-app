@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever any file changes so phones pick up the update.
-const VERSION = 'cloud-v1';
+const VERSION = 'cloud-v2';
 const FILES = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',

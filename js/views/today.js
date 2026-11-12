@@ -3,6 +3,8 @@ import { dueCards, newCards, newAllowance, today, todaysDrill, benchDue, forecas
 import { esc, head } from '../ui.js';
 import { DAY, dayKey } from '../srs.js';
 import { streak } from '../scoring.js';
+import { suggested } from './sprint.js';
+import { TYPES } from '../arith.js';
 
 const step = (n, title, sub, href, done, cta) => `<li><a href="${href}">
   <span class="tag ${done ? 'done' : 'due'}">${done ? '✓' : n}</span>
@@ -13,6 +15,8 @@ export function render(root) {
   const s = get(), t = today();
   const due = dueCards().length, fresh = newCards(newAllowance()).length;
   const drill = todaysDrill();
+  const sug = suggested(), mins = Math.round(s.settings.sprintSecs / 60);
+  const arith = sug.mode === 'learn' ? ['Arithmetic: learn a method', `${TYPES[sug.learnType].name}, untimed`] : sug.mode === 'applied' ? ['Arithmetic: applied sprint', `${mins} minutes of short business problems`] : ['Arithmetic: mixed sprint', `${mins} minutes, more of your weakest types`];
   const days = Object.keys(s.days);
   const run = streak(days, Date.now(), dayKey);
   const allDone = t.cards && t.sprint && t.drill;
@@ -29,7 +33,7 @@ export function render(root) {
     <section class="card"><h2>Daily session</h2><p class="muted small">About 15 minutes.</p>
       <ul class="list">
         ${step(1, 'Concept cards', cardSub, '#/review', t.cards || due + fresh === 0, 'Start')}
-        ${step(2, 'Arithmetic sprint', `${Math.round(s.settings.sprintSecs / 60)} minutes, mixed types`, '#/practice/sprint', t.sprint, 'Start')}
+        ${step(2, arith[0], arith[1], '#/practice/sprint', t.sprint, 'Start')}
         ${step(3, drill.t, drill.d, '#/practice/' + drill.k, t.drill, 'Start')}
       </ul>
     </section>

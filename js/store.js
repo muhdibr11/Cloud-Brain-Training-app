@@ -7,7 +7,7 @@ export const blank = () => ({
   cards: {},        // id -> {step, reps, lapses, due, last, introduced}
   custom: [],       // user-added concept cards
   reviews: [],      // {t, id, mode, grade, conf}
-  arith: { levels: {}, sessions: [] },   // sessions: {t, dur, n, correct, medMs, bench}
+  arith: { stats: {}, sessions: [] },    // stats: type -> {rating, hist, learned}; sessions: {t, mode, dur, n, correct, medMs, bench}
   calib: [],        // {t, src, conf, hit}
   intervals: [],    // {t, id, lo, hi, v, hit, kind, factor}
   seen: {},         // item id -> last seen time (judgement, estimates, held-out questions)

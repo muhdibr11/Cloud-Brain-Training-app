@@ -97,6 +97,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 36px; }
 
 /* arithmetic sprint */
 .sprint-q { padding: 4px 0 12px; font-size: 30px; font-weight: 700; text-align: center; min-height: 84px; display: grid; place-items: center; letter-spacing: -0.01em; }
+.sprint-q.applied { font-size: 21px; line-height: 1.35; text-align: left; font-weight: 600; }
 .sprint-in { font-size: 34px; font-weight: 600; text-align: center; min-height: 56px; border-bottom: 2px solid var(--line); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
 .sprint-in small { font-size: 18px; color: var(--text-2); font-weight: 400; }
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -131,3 +132,8 @@ body.focus #tabs { display: none; }
 
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 ol { padding-left: 22px; margin: 8px 0; } ol li { margin-bottom: 4px; }
+
+details.card summary { font-weight: 600; cursor: pointer; min-height: 28px; }
+details.card[open] summary { margin-bottom: 10px; }
+ul { padding-left: 22px; margin: 8px 0; }
+ul.list, ul.checks { padding-left: 0; }

@@ -9,6 +9,23 @@ export const median = (a) => {
 // forecasts: [{p (0..1), outcome (0|1)}]
 export const brier = (fs) => mean(fs.map((f) => (f.p - f.outcome) ** 2));
 
+// Forecast scoring. Updates are allowed until the end of the due date. The score is the Brier score of each
+// probability weighted by how long it was held, so a last-minute update earns almost nothing.
+export const dueEnd = (due) => new Date(due + 'T23:59:59').getTime();
+export const canUpdate = (f, now = Date.now()) => f.outcome == null && now <= dueEnd(f.due);
+export const firstP = (f) => f.updates?.[0]?.p ?? f.p;
+export function forecastBrier(f) {
+  const ups = f.updates?.length ? f.updates : [{ t: f.created, p: f.p }];
+  const end = Math.min(f.resolved ?? Infinity, dueEnd(f.due));
+  let w = 0, sum = 0;
+  ups.forEach((u, i) => {
+    const d = Math.max(0, Math.min(ups[i + 1]?.t ?? end, end) - u.t);
+    sum += d * (u.p - f.outcome) ** 2; w += d;
+  });
+  return w > 0 ? sum / w : (ups[0].p - f.outcome) ** 2;
+}
+export const meanForecastBrier = (fs) => mean(fs.map(forecastBrier));
+
 // items: [{conf (0..1), hit (bool)}] -> bins with mean confidence and hit rate
 export function calibrationBins(items, edges = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0001]) {
   const bins = [];
