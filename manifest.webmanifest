@@ -1,0 +1,15 @@
+{
+  "name": "Cloud",
+  "short_name": "Cloud",
+  "description": "Personal training for thinking skills that can actually be trained.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fcfcfb",
+  "theme_color": "#2a78d6",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

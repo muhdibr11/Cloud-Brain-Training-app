@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Cloud</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cloud">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main id="view" tabindex="-1"></main>
+<nav id="tabs" aria-label="Sections">
+  <a href="#/today" data-tab="today"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span>Today</span></a>
+  <a href="#/library" data-tab="library"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="13" height="16" rx="2"/><path d="M8 21h10a2 2 0 0 0 2-2V7"/></svg><span>Library</span></a>
+  <a href="#/practice" data-tab="practice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 5 13h6l-1 9 8-11h-6z"/></svg><span>Practice</span></a>
+  <a href="#/forecasts" data-tab="forecasts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M6 16l4-5 3 3 5-8"/></svg><span>Forecasts</span></a>
+  <a href="#/progress" data-tab="progress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-7M12 20V4M19 20v-11"/></svg><span>Progress</span></a>
+</nav>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
